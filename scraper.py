@@ -1,24 +1,32 @@
 import csv
+import os
+import pandas as pd
+import sqlite3
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.common.exceptions import TimeoutException
+from selenium.common.exceptions import TimeoutException, WebDriverException
 
 options = webdriver.ChromeOptions()
-options.page_load_strategy = "none"
+options.page_load_strategy = "eager"
+options.add_argument("--disable-gpu")
+options.add_argument("--no-sandbox")
 
 driver = webdriver.Chrome(service=ChromeService(ChromeDriverManager().install()), options=options)
-driver.set_page_load_timeout(5)
+driver.set_page_load_timeout(60)
 
 try:
     url = "https://www.timeanddate.com/weather/"
     print("Fetching URL...")
-    driver.get(url)
+    try:
+        driver.get(url)
+    except WebDriverException as e:
+        print(f"Network warning during driver.get(): {e}. Continuing if elements are present...")
 
-    wait = WebDriverWait(driver, 15)
+    wait = WebDriverWait(driver, 20)
   
     wait.until(
         EC.presence_of_all_elements_located(
@@ -28,8 +36,6 @@ try:
     print("Rows found:", len(rows))
 
     scraped_data = []
-    
-
 
     city_elements = driver.find_elements(By.CSS_SELECTOR, "table.zebra tbody tr td:nth-child(1) a")
     temp_elements = driver.find_elements(
@@ -64,10 +70,21 @@ try:
 
     print(f"Successfully scraped data and saved to {csv_filename}")
 
+    db_dir = "db"
+    os.makedirs(db_dir, exist_ok=True)
+    db_path = os.path.join(db_dir, "weather_school.db")
+
+    df = pd.read_csv(csv_filename)
+    df = df.dropna().drop_duplicates()
+
+    with sqlite3.connect(db_path) as conn:
+        df.to_sql("weather_data", conn, if_exists="replace", index=False)
+
+    print("Successfully loaded scraped data into the SQLite database!")
+    
 except TimeoutException:
         print("Could not find the weather table within the waiting period.")
 except Exception as e:
         print(f"An error occurred during web scraping: {e}")
-    
 finally:
     driver.quit()

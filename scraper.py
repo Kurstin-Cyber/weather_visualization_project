@@ -75,12 +75,19 @@ try:
     db_path = os.path.join(db_dir, "weather_school.db")
 
     df = pd.read_csv(csv_filename)
+    print(f"\n---Data Cleaning & Transformation ---")
+    print(f"Before cleaning: {len(df)} rows loaded from CSV.")
+
     df = df.dropna().drop_duplicates()
+    print(f"After cleaning (dropped nulls & duplicates): {len(df)} rows remaining.")
+
+    print("\nCleaned Data Preview:")
+    print(df.head())
 
     with sqlite3.connect(db_path) as conn:
         df.to_sql("weather_data", conn, if_exists="replace", index=False)
 
-    print("Successfully loaded scraped data into the SQLite database!")
+    print(f"\nSuccessfully loaded cleaned data into the SQLite database at '{db_path}'!")
     
 except TimeoutException:
         print("Could not find the weather table within the waiting period.")
